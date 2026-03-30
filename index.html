@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>블리스 폭탄 돌리기 (Time Attack Edition)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&family=Playfair+Display:ital,wght@1,600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050508;
+            --neon-red: #ff3b30;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-color); color: white; }
+        
+        body {
+            background: radial-gradient(circle at 50% 50%, #1a0a0a 0%, var(--bg-color) 80%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        /* --- 비밀번호 잠금 화면 스타일 --- */
+        #lock-screen {
+            position: fixed; inset: 0; background: var(--bg-color);
+            z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .lock-box {
+            width: 280px; padding: 40px 20px; text-align: center;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 30px; backdrop-filter: blur(20px);
+        }
+        .lock-title { font-size: 14px; letter-spacing: 3px; color: #888; margin-bottom: 25px; }
+        #pw-input {
+            width: 100%; background: transparent; border: none; border-bottom: 2px solid #333;
+            color: white; font-size: 24px; text-align: center; letter-spacing: 5px;
+            outline: none; margin-bottom: 30px; transition: 0.3s;
+        }
+        #pw-input:focus { border-bottom-color: #ff416c; }
+        .pw-btn {
+            width: 100%; padding: 15px; border-radius: 15px; border: none;
+            background: linear-gradient(135deg, #ff416c, #ff4b2b); color: white; font-weight: 700; cursor: pointer;
+        }
+
+        /* 메인 게임 컨텐츠 (기본 숨김) */
+        #main-content { display: none; flex-direction: column; align-items: center; width: 100%; }
+
+        #game-container {
+            width: min(90vw, 400px);
+            text-align: center;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .title { 
+            font-family: 'Playfair Display', serif; 
+            font-size: 24px; 
+            letter-spacing: 5px; 
+            margin-bottom: 10px; 
+            color: #ff4d4d; 
+            text-shadow: 0 0 15px rgba(255,77,77,0.3);
+        }
+
+        /* 폭탄 비주얼 */
+        #bomb-visual {
+            position: relative;
+            width: 160px; height: 160px; 
+            margin: 40px auto 30px;
+            background: radial-gradient(circle at 30% 30%, #444, #111);
+            border-radius: 50%;
+            box-shadow: 0 20px 60px rgba(0,0,0,1), inset -10px -10px 30px rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: transform 0.1s ease-out;
+        }
+        #bomb-visual.warning { 
+            background: radial-gradient(circle at 30% 30%, #800, #200); 
+            box-shadow: 0 0 50px rgba(255,0,0,0.4);
+        }
+        
+        .beat { animation: heart-beat 0.2s ease-out; }
+        @keyframes heart-beat {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* 미션 개별 타이머 바 */
+        #mission-timer-container {
+            width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+            border-radius: 3px; margin-bottom: 15px; overflow: hidden;
+        }
+        #mission-timer-bar {
+            width: 100%; height: 100%; background: #ff4d4d;
+            transition: width 0.1s linear;
+        }
+
+        #mission-text {
+            width: 100%;
+            min-height: 100px; padding: 20px; font-size: 18px; line-height: 1.6; font-weight: 500;
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 20px; margin-bottom: 20px; backdrop-filter: blur(15px);
+            display: flex; align-items: center; justify-content: center; word-break: keep-all;
+        }
+
+        .btn-main {
+            width: 100%; padding: 20px; font-size: 17px; font-weight: 700; letter-spacing: 1px;
+            border: none; border-radius: 20px; cursor: pointer;
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: white; box-shadow: 0 10px 25px rgba(255, 75, 43, 0.4);
+            transition: all 0.3s;
+        }
+        .btn-main:active { transform: scale(0.96); }
+        
+        /* 미션 완료 버튼 */
+        #done-btn {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: #050508; display: none; margin-bottom: 10px;
+        }
+
+        /* 결과 오버레이 */
+        #result-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98);
+            z-index: 100; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(20px); text-align: center; padding: 30px;
+        }
+        #result-overlay.show { display: flex; }
+        #result-overlay h1 { font-size: 100px; margin-bottom: 10px; }
+        
+        .punishment-box { font-size: 22px; font-weight: 700; color: white; margin-top: 20px; margin-bottom: 50px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div id="lock-screen">
+        <div class="lock-box">
+            <div class="lock-title">ACCESS CODE</div>
+            <input type="password" id="pw-input" inputmode="numeric" maxlength="4" placeholder="••••">
+            <button class="pw-btn" onclick="checkPassword()">ENTER</button>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="game-container">
+            <div class="title">BLISS BOMB</div>
+
+            <div id="bomb-visual">
+                <span id="mission-sec" style="font-size: 32px; font-weight: 800; color: #ff4d4d;"></span>
+                <span style="font-size: 10px; opacity: 0.5;">LIMIT</span>
+            </div>
+
+            <div id="mission-timer-container">
+                <div id="mission-timer-bar"></div>
+            </div>
+
+            <div id="mission-text">제한시간 10초!<br>미션 완료 후 버튼을 눌러 넘기세요</div>
+
+            <button id="done-btn" class="btn-main" onclick="completeMission()">미션 완료 & PASS</button>
+            <button id="action-btn" class="btn-main" onclick="startGame()">BOMB START</button>
+        </div>
+    </div>
+
+    <div id="result-overlay">
+        <div style="font-size: 20px; font-weight: 700; color: #ff3b30; letter-spacing: 5px; margin-bottom: 20px;">STOP!</div>
+        <h1>💥</h1>
+        <div id="fail-reason" style="color: #ff8888; font-size: 14px; margin-top: -10px;">시간 초과!</div>
+        <div class="punishment-box" id="final-punishment"></div>
+        <button class="btn-main" onclick="resetGame()" style="width: 220px; background: #333; box-shadow: none;">다시 하기</button>
+    </div>
+
+<script>
+    // --- 비밀번호 설정 ---
+    const SECRET_PW = "1234"; 
+
+    function checkPassword() {
+        const input = document.getElementById('pw-input').value;
+        if(input === SECRET_PW) {
+            document.getElementById('lock-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'flex';
+        } else {
+            alert("비밀번호가 틀렸습니다.");
+            document.getElementById('pw-input').value = "";
+        }
+    }
+
+    // 엔터키 입력 지원
+    document.getElementById('pw-input').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkPassword();
+    });
+
+    // --- 미션 데이터 ---
+    const missions = [
+        "옆 사람의 귀에 3초간 바람 넣기",
+        "지금 생각나는 가장 야한 단어 말하기",
+        "상대방의 목덜미 키스",
+        "오늘 입은 속옷 색깔 고백하기",
+        "상대방 허벅지를 부드럽게 쓸기",
+        "상대방 엉덩이 쓰다듬기",
+        "자신있는 신체 부위 보여주기",
+        "상대방 소중이 쓰다듬기",
+        "상대방과 짧은 키스",
+        "상대방 옷위로 유두 살살 쓰다듬기",
+        "상대방 귓바퀴 핥기",
+        "1게임 진행동안 여자가 상대방 허벅지위에 앉기",
+        "상대방의 손등에 부드럽게 입맞춤",
+        "섹시한 포즈 3초 유지하기",
+        "상대방의 귓속말로 은밀한 고백",
+        "손 잡고있기",
+        "상대방의 목덜미에 코 대고 깊게 숨 들이마시기",
+        "옆 사람의 쇄골 라인 손가락으로 따라 그리기",
+        "상대방의 허리 뒤로 손을 넣어 꽉 안아주기",
+        "상대방의 귓불을 살짝 깨물기",
+        "상대방의 가슴팍에 귀 대고 심장 소리 듣기",
+        "옆 사람의 입술 아래 점 찍듯 뽀뽀하기",
+        "상대방의 옷 속으로 손 넣어 등 쓸어내리기",
+        "양손으로 상대방의 볼을 감싸고 3초간 고정",
+        "상대방의 허벅지 안쪽 5cm 지점 터치하기",
+        "옆 사람의 발목 부드럽게 움켜쥐기",
+        "상대방의 엉덩이 살짝 쥐기",
+        "상대방의 코끝과 내 코끝 맞대기",
+        "상대방 손바닥에 혓바닥으로 원 그리기"
+    ];
+
+    const punishments = [
+        "술마시기",
+        "옆사람 소원 들어주기",
+        "벌칙주 마시기"
+    ];
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+
+    function initAudio() { if (!audioCtx) audioCtx = new AudioContext(); }
+
+    function playHeartbeatSound() {
+        const now = audioCtx.currentTime;
+        createThump(now, 60, 0.8);
+        createThump(now + 0.15, 55, 0.5);
+        const bomb = document.getElementById('bomb-visual');
+        bomb.classList.remove('beat');
+        void bomb.offsetWidth;
+        bomb.classList.add('beat');
+    }
+
+    function createThump(time, freq, vol) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(vol, time);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(time); osc.stop(time + 0.1);
+    }
+
+    function playExplosionSound() {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 1.0);
+    }
+
+    let totalTimeLeft = 0;      
+    let missionTimeLeft = 10;   
+    let isRunning = false;
+    let heartbeatTimeout = null;
+    let mainInterval = null;
+
+    function startGame() {
+        initAudio();
+        if (isRunning) return;
+
+        isRunning = true;
+        document.getElementById('action-btn').style.display = 'none';
+        document.getElementById('done-btn').style.display = 'block';
+        
+        totalTimeLeft = Math.floor(Math.random() * 31) + 30;
+        
+        nextMission();
+        heartbeatLoop();
+        
+        mainInterval = setInterval(() => {
+            totalTimeLeft--;
+            missionTimeLeft--;
+            
+            updateUI();
+
+            if (missionTimeLeft <= 0) {
+                explode("미션 수행 실패!");
+            }
+            else if (totalTimeLeft <= 0) {
+                explode("폭탄 수명 종료!");
+            }
+
+            if (totalTimeLeft <= 10) document.getElementById('bomb-visual').classList.add('warning');
+        }, 1000);
+    }
+
+    function nextMission() {
+        missionTimeLeft = 10;
+        const rand = Math.floor(Math.random() * missions.length);
+        document.getElementById('mission-text').innerHTML = missions[rand];
+        updateUI();
+    }
+
+    function completeMission() {
+        if (!isRunning) return;
+        nextMission(); 
+    }
+
+    function updateUI() {
+        document.getElementById('mission-sec').innerText = missionTimeLeft;
+        const bar = document.getElementById('mission-timer-bar');
+        bar.style.width = (missionTimeLeft * 10) + "%";
+        
+        if (missionTimeLeft <= 3) bar.style.background = "#ff3b30";
+        else bar.style.background = "#43e97b";
+    }
+
+    function heartbeatLoop() {
+        if (!isRunning) return;
+        playHeartbeatSound();
+        let interval = totalTimeLeft > 20 ? 1000 : (totalTimeLeft > 10 ? 600 : 300);
+        heartbeatTimeout = setTimeout(heartbeatLoop, interval);
+    }
+
+    function explode(reason) {
+        isRunning = false;
+        clearInterval(mainInterval);
+        clearTimeout(heartbeatTimeout);
+        playExplosionSound();
+        
+        if(navigator.vibrate) navigator.vibrate([500, 200, 500]);
+
+        document.getElementById('fail-reason').innerText = reason;
+        const randP = Math.floor(Math.random() * punishments.length);
+        document.getElementById('final-punishment').innerText = punishments[randP];
+        
+        document.getElementById('result-overlay').classList.add('show');
+    }
+
+    function resetGame() {
+        isRunning = false;
+        clearInterval(mainInterval);
+        clearTimeout(heartbeatTimeout);
+        document.getElementById('result-overlay').classList.remove('show');
+        document.getElementById('action-btn').style.display = 'block';
+        document.getElementById('done-btn').style.display = 'none';
+        document.getElementById('bomb-visual').classList.remove('warning', 'beat');
+        document.getElementById('mission-timer-bar').style.width = "100%";
+        document.getElementById('mission-sec').innerText = "";
+        document.getElementById('mission-text').innerHTML = "제한시간 10초!<br>미션 완료 후 버튼을 눌러 넘기세요";
+    }
+</script>
+</body>
+</html>
